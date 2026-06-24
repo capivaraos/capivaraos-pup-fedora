@@ -162,3 +162,12 @@ qemu-system-x86_64 -m 4096 -enable-kvm \
 - `../capivaraos-marsh-fedora/` — spin KDE Plasma do CapivaraOS (tema
   WhiteSur/macOS), referência de estrutura usada para este projeto.
 - `PACKAGES.md` — racional completo da seleção de pacotes desta spin.
+
+## Comunidade
+
+- Encontrou um bug ou tem uma sugestão? Abra uma [issue](../../issues/new/choose).
+- Dúvidas gerais ou ideias em aberto? Use as [Discussions](../../discussions).
+- Vulnerabilidade de segurança? Veja [`SECURITY.md`](SECURITY.md) — não abra issue pública.
+- Quer contribuir com código? Veja [`CONTRIBUTING.md`](CONTRIBUTING.md).
+- Este projeto segue o [Código de Conduta](CODE_OF_CONDUCT.md) do CapivaraOS.
+- Licenciado sob [GPLv3](LICENSE).
