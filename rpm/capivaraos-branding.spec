@@ -15,8 +15,8 @@
 #     sem decoração de terceiros.
 
 Name:           capivaraos-branding
-Version:        1.0.0
-Release:        6%{?dist}
+Version:        1.1.0
+Release:        1%{?dist}
 Summary:        Identidade visual, wallpapers e branding padrão do CapivaraOS Pup
 
 License:        CC-BY-SA-4.0 AND MIT
@@ -74,9 +74,10 @@ mkdir -p build/pixmaps
 "$CONVERT" icons/capivaraos-logo.png -fill white -colorize 100% \
     -resize 256x256 build/pixmaps/capivaraos-white.png
 
-# ── 4. Avatar padrão (.face): recorta só a capivara, fundo branco quadrado ──
-"$CONVERT" backgrounds/CapivaraOS_Logo.png -crop 1536x600+0+0 +repage -trim +repage \
-    -gravity center -background white -extent 1700x1700 \
+# ── 4. Avatar padrão (.face): só a capivara, fundo branco quadrado ──────────
+# Vem de icons/capivaraos-logo.png (canvas quadrado, capivara sem texto), não
+# de um -crop sobre a logo-mestre -- ver a nota em 4b sobre coordenadas fixas.
+"$CONVERT" icons/capivaraos-logo.png -background white -flatten \
     -resize 256x256 build/pixmaps/capivaraos-face.png
 
 # ── 4b. Logo quadrada (capivara, sem texto, fundo transparente) para o
@@ -92,11 +93,15 @@ mkdir -p build/pixmaps
 # ficando minúscula independente do quanto se reduza o padding. Um recorte
 # já aproximadamente quadrado da cabeça preenche a caixa corretamente.
 mkdir -p build/cockpit
-# Recorte da cabeça trimado fica perto de 345x297; 390x390 dá ~12-30% de
-# padding (valor fixo: o shim "convert" do IMv7 não aceita a sintaxe
-# dinâmica de -extent baseada em fx que o "magick" nativo aceita).
-"$CONVERT" backgrounds/CapivaraOS_Logo.png -crop 360x300+480+90 +repage -trim +repage \
-    -gravity center -background none -extent 390x390 \
+# A cabeça vem de icons/capivaraos-head.png (460x460, canvas quadrado, fundo
+# transparente), um asset versionado -- e NÃO de um -crop com coordenadas
+# fixas sobre a logo-mestre. Até a 1.0.0 isto era
+# "-crop 360x300+480+90 backgrounds/CapivaraOS_Logo.png", calibrado para a
+# logo antiga (capivara sentada, cabeça no centro-topo); na logo nova
+# (capivara andando, cabeça à esquerda) essas mesmas coordenadas recortam o
+# lombo do animal. Um recorte por coordenadas quebra em silêncio a cada troca
+# de arte, então a cabeça agora é um arquivo próprio.
+"$CONVERT" icons/capivaraos-head.png \
     -resize 256x256 build/cockpit/logo.png
 "$CONVERT" build/cockpit/logo.png -resize 32x32 build/cockpit/favicon.ico
 
@@ -482,7 +487,7 @@ plymouth-set-default-theme capivaraos >/dev/null 2>&1 || true
 # escritos aqui (em vez de %files) para evitar conflito de arquivo no dnf.
 cat > %{_sysconfdir}/os-release << 'EOF'
 NAME="CapivaraOS"
-VERSION="Pup 1.0.0"
+VERSION="Pup 1.1.0"
 RELEASE_TYPE=stable
 ID=capivaraos
 ID_LIKE=fedora
@@ -502,26 +507,41 @@ REDHAT_BUGZILLA_PRODUCT="Fedora"
 REDHAT_BUGZILLA_PRODUCT_VERSION=44
 REDHAT_SUPPORT_PRODUCT="Fedora"
 REDHAT_SUPPORT_PRODUCT_VERSION=44
-VARIANT="Pup 1.0.0"
+VARIANT="Pup 1.1.0"
 VARIANT_ID=pup
 EOF
 
 cat > %{_sysconfdir}/issue << 'EOF'
-CapivaraOS Pup 1.0.0 \n \l
+CapivaraOS Pup 1.1.0 \n \l
 
 EOF
 
 cat > %{_sysconfdir}/issue.net << 'EOF'
-CapivaraOS Pup 1.0.0
+CapivaraOS Pup 1.1.0
 EOF
 
 # ── Reaplica os-release apos qualquer atualizacao futura do sistema ────────
 # Ver justificativa detalhada no spec da spin KDE (mesmo mecanismo: garante
 # que o titulo GRUB/BLS de kernels novos nao volte a "Fedora Linux").
-%transfiletriggerin -- %{_sysconfdir}/os-release
+#
+# ATENCAO -- NAO troque o prefixo abaixo por um caminho de arquivo exato
+# (ex.: /etc/os-release). Verificado empiricamente em container fedora:44
+# (2026-07-17, spin Marsh): o %transfiletriggerin casa APENAS com prefixos de
+# DIRETORIO e NUNCA com caminhos de arquivo exatos. Ate a 1.0.0 este gatilho
+# era "-- %{_sysconfdir}/os-release" -- codigo morto: nunca disparou uma
+# unica vez, e o bug que ele deveria corrigir seguia acontecendo em silencio.
+#
+# Por isso vigiamos o diretorio /usr/lib (dirname do arquivo que importa:
+# /usr/lib/os-release, que pertence ao fedora-release-identity-basic; o
+# /etc/os-release e apenas um symlink para ele). Esse prefixo dispara em
+# quase toda transacao, entao a guarda logo abaixo faz o caso comum sair de
+# imediato; so pagamos o kernel-install quando o os-release foi revertido.
+%transfiletriggerin -- %{_prefix}/lib
+# Caso comum: nosso os-release intacto, nada a fazer.
+grep -q '^NAME="CapivaraOS"' %{_prefix}/lib/os-release 2>/dev/null && exit 0
 cat > %{_sysconfdir}/os-release << 'EOF'
 NAME="CapivaraOS"
-VERSION="Pup 1.0.0"
+VERSION="Pup 1.1.0"
 RELEASE_TYPE=stable
 ID=capivaraos
 ID_LIKE=fedora
@@ -541,17 +561,17 @@ REDHAT_BUGZILLA_PRODUCT="Fedora"
 REDHAT_BUGZILLA_PRODUCT_VERSION=44
 REDHAT_SUPPORT_PRODUCT="Fedora"
 REDHAT_SUPPORT_PRODUCT_VERSION=44
-VARIANT="Pup 1.0.0"
+VARIANT="Pup 1.1.0"
 VARIANT_ID=pup
 EOF
 
 cat > %{_sysconfdir}/issue << 'EOF'
-CapivaraOS Pup 1.0.0 \n \l
+CapivaraOS Pup 1.1.0 \n \l
 
 EOF
 
 cat > %{_sysconfdir}/issue.net << 'EOF'
-CapivaraOS Pup 1.0.0
+CapivaraOS Pup 1.1.0
 EOF
 
 for kver in $(ls /lib/modules 2>/dev/null); do
@@ -576,6 +596,35 @@ done
 %{_datadir}/cockpit/branding/capivaraos/
 
 %changelog
+* Tue Jul 21 2026 CapivaraOS Project <capivaraos-bot@users.noreply.github.com> - 1.1.0-1
+- Rebrand: nova logo do CapivaraOS (capivara andando) em todo o branding.
+  A logo anterior (capivara sentada) era derivada de um desenho de banco de
+  imagens e apresentava risco de similaridade substancial; a nova arte e
+  original. Ver DOC-6.
+  . backgrounds/CapivaraOS_Logo.png trocada pela arte nova (mesmo canvas
+    1536x1024), e icons/capivaraos-logo.png pela capivara sem texto.
+  . 7 wallpapers de cor solida e o icone quadrado icons/capivaraos.png
+    regerados por branding/regen-solid-wallpapers.sh (script novo aqui,
+    trazido da spin Marsh -- offline, nao precisa de rede).
+  . 6 wallpapers fotograficos regerados por regen-photo-wallpapers.sh, para
+    que a marca d'agua e os creditos saiam com a logo nova.
+- Assets derivados deixam de sair de -crop com coordenadas fixas sobre a
+  logo-mestre e passam a vir de arquivos versionados:
+  . logo do Cockpit/Anaconda WebUI: agora icons/capivaraos-head.png (asset
+    novo). O recorte antigo, "-crop 360x300+480+90", fora calibrado para a
+    capivara sentada; com a logo nova ele recortava o LOMBO do animal, sem
+    falhar o build -- o instalador sairia com uma mancha marrom no lugar da
+    logo.
+  . avatar padrao (.face): agora icons/capivaraos-logo.png achatada sobre
+    branco, no lugar de "-crop 1536x600+0+0".
+- Corrige o file trigger de os-release, que era codigo morto: o gatilho era
+  "%transfiletriggerin -- /etc/os-release", um caminho de ARQUIVO exato, e o
+  %transfiletriggerin casa apenas com prefixos de DIRETORIO. Ele nunca
+  disparou uma unica vez desde a 1.0.0. Agora vigia /usr/lib (com guarda de
+  saida rapida), como na spin Marsh. Sem isso, uma atualizacao futura do
+  fedora-release reverteria o os-release e o titulo GRUB/BLS de kernels
+  novos voltaria a "Fedora Linux".
+
 * Fri Jun 19 2026 CapivaraOS Project <capivaraos-bot@users.noreply.github.com> - 1.0.0-6
 - Corrige causa raiz REAL do wallpaper Xfce nao aplicar por padrao: o nome
   do "monitor" usado pelo xfdesktop pra renderizar varia por ambiente
