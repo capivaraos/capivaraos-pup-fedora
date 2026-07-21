@@ -43,14 +43,32 @@ baixar() {
 
 # Gera um wallpaper final a partir da foto original.
 #   $1 = arquivo original   $2 = saída (.png)   $3 = crédito (texto)
+#
+# ZONA SEGURA — por que a logo e o crédito ficam a 250px das laterais, e não
+# nos 40/24px que seriam o natural para um canto.
+#
+# O wallpaper é 16:9 (1920x1080). Numa tela 4:3 exibida em "Ampliado"/zoom, o
+# xfdesktop escala pela altura e corta a largura que sobra: 1920 - (1080*4/3)
+# = 480px, ou seja 240px de CADA lado. Tudo que estiver a menos de 240px da
+# borda lateral simplesmente não existe nessa tela.
+#
+# Com os 40/24px antigos, logo e crédito caíam inteiros dentro da faixa
+# cortada — confirmado em VM 4:3 em 2026-07-21, onde o crédito aparecia como
+# "...ann — CC BY-SA 4.0". Isso é mais que estética: as fotos são CC BY-SA e
+# a licença EXIGE atribuição, então um crédito cortado é um problema de
+# licenciamento, não de layout.
+#
+# 250px dá 10px de folga sobre os 240 necessários. O estilo padrão da spin é
+# "Esticado" (não corta nada), mas o usuário pode trocar pelo seletor a
+# qualquer momento — a zona segura protege independente do estilo escolhido.
 gerar() {
     local orig="$1" saida="$2" credito="$3"
     "$CONVERT" "$orig" \
         -resize 1920x1080^ -gravity center -extent 1920x1080 \
-        "${TMP}/logo-branca.png" -gravity southeast -geometry +40+45 -composite \
+        "${TMP}/logo-branca.png" -gravity southeast -geometry +250+45 -composite \
         -gravity southwest -font Liberation-Sans -pointsize 22 \
         -undercolor '#00000066' -fill white \
-        -annotate +24+104 "  ${credito}  " \
+        -annotate +250+104 "  ${credito}  " \
         "$saida"
     echo "  gerado: $(basename "$saida")"
 }

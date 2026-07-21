@@ -15,8 +15,13 @@
 #     sem decoração de terceiros.
 
 Name:           capivaraos-branding
-Version:        1.1.0
-Release:        1%{?dist}
+Version:        1.1.1
+# Sufixo ".pup": as tres spins constroem um pacote com este MESMO Name e
+# compartilham ~/rpmbuild, entao sem ele duas spins na mesma Version-Release
+# geram nomes de arquivo identicos -- ja causou dois incidentes (dnf instalou
+# o RPM do Pup no lugar do Snout em junho; build do Pup consumiu sources da
+# Marsh em 21/07, BUG-30). Com o sufixo a colisao e impossivel por construcao.
+Release:        1%{?dist}.pup
 Summary:        Identidade visual, wallpapers e branding padrão do CapivaraOS Pup
 
 License:        CC-BY-SA-4.0 AND MIT
@@ -487,7 +492,7 @@ plymouth-set-default-theme capivaraos >/dev/null 2>&1 || true
 # escritos aqui (em vez de %files) para evitar conflito de arquivo no dnf.
 cat > %{_sysconfdir}/os-release << 'EOF'
 NAME="CapivaraOS"
-VERSION="Pup 1.1.0"
+VERSION="Pup 1.1.1"
 RELEASE_TYPE=stable
 ID=capivaraos
 ID_LIKE=fedora
@@ -507,17 +512,17 @@ REDHAT_BUGZILLA_PRODUCT="Fedora"
 REDHAT_BUGZILLA_PRODUCT_VERSION=44
 REDHAT_SUPPORT_PRODUCT="Fedora"
 REDHAT_SUPPORT_PRODUCT_VERSION=44
-VARIANT="Pup 1.1.0"
+VARIANT="Pup 1.1.1"
 VARIANT_ID=pup
 EOF
 
 cat > %{_sysconfdir}/issue << 'EOF'
-CapivaraOS Pup 1.1.0 \n \l
+CapivaraOS Pup 1.1.1 \n \l
 
 EOF
 
 cat > %{_sysconfdir}/issue.net << 'EOF'
-CapivaraOS Pup 1.1.0
+CapivaraOS Pup 1.1.1
 EOF
 
 # ── Reaplica os-release apos qualquer atualizacao futura do sistema ────────
@@ -541,7 +546,7 @@ EOF
 grep -q '^NAME="CapivaraOS"' %{_prefix}/lib/os-release 2>/dev/null && exit 0
 cat > %{_sysconfdir}/os-release << 'EOF'
 NAME="CapivaraOS"
-VERSION="Pup 1.1.0"
+VERSION="Pup 1.1.1"
 RELEASE_TYPE=stable
 ID=capivaraos
 ID_LIKE=fedora
@@ -561,17 +566,17 @@ REDHAT_BUGZILLA_PRODUCT="Fedora"
 REDHAT_BUGZILLA_PRODUCT_VERSION=44
 REDHAT_SUPPORT_PRODUCT="Fedora"
 REDHAT_SUPPORT_PRODUCT_VERSION=44
-VARIANT="Pup 1.1.0"
+VARIANT="Pup 1.1.1"
 VARIANT_ID=pup
 EOF
 
 cat > %{_sysconfdir}/issue << 'EOF'
-CapivaraOS Pup 1.1.0 \n \l
+CapivaraOS Pup 1.1.1 \n \l
 
 EOF
 
 cat > %{_sysconfdir}/issue.net << 'EOF'
-CapivaraOS Pup 1.1.0
+CapivaraOS Pup 1.1.1
 EOF
 
 for kver in $(ls /lib/modules 2>/dev/null); do
@@ -596,6 +601,21 @@ done
 %{_datadir}/cockpit/branding/capivaraos/
 
 %changelog
+* Tue Jul 21 2026 CapivaraOS Project <capivaraos-bot@users.noreply.github.com> - 1.1.1-1
+- Zona segura nos wallpapers de foto: a logo e o credito de autoria sairam de
+  40px/24px das laterais para 250px. Numa tela 4:3 exibindo um wallpaper 16:9
+  em "Ampliado"/zoom, o corte e de 240px de CADA lado -- logo e credito caiam
+  inteiros na faixa cortada. Confirmado em VM 4:3, onde o credito aparecia
+  truncado como "...ann - CC BY-SA 4.0". As fotos sao CC BY-SA e a licenca
+  EXIGE atribuicao, entao um credito cortado e um problema de licenciamento,
+  nao so de layout. O estilo padrao da spin continua "Esticado" (que nao
+  corta); a zona segura protege tambem quem trocar o estilo pelo seletor.
+- Sufixo ".pup" no Release: as tres spins constroem um pacote com o mesmo Name
+  e compartilham ~/rpmbuild, entao versoes iguais entre spins geravam nomes de
+  arquivo identicos. Com o sufixo a colisao e impossivel por construcao, em
+  vez de depender de escolher versoes livres na mao.
+- Versao 1.1.0 -> 1.1.1 tambem resolve a duplicata com a Marsh 1.1.0.
+
 * Tue Jul 21 2026 CapivaraOS Project <capivaraos-bot@users.noreply.github.com> - 1.1.0-1
 - Rebrand: nova logo do CapivaraOS (capivara andando) em todo o branding.
   A logo anterior (capivara sentada) era derivada de um desenho de banco de
