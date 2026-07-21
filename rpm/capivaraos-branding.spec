@@ -15,7 +15,7 @@
 #     sem decoração de terceiros.
 
 Name:           capivaraos-branding
-Version:        1.1.1
+Version:        1.1.2
 # Sufixo ".pup": as tres spins constroem um pacote com este MESMO Name e
 # compartilham ~/rpmbuild, entao sem ele duas spins na mesma Version-Release
 # geram nomes de arquivo identicos -- ja causou dois incidentes (dnf instalou
@@ -132,7 +132,15 @@ DEFAULT_WP=%{_datadir}/backgrounds/capivaraos/capivaraos-desktop-roxo-branco.png
 
 # ── Wallpapers (arquivos originais + créditos) ──────────────────────────────
 install -d %{buildroot}%{_datadir}/backgrounds/capivaraos
-install -m 0644 backgrounds/*.png %{buildroot}%{_datadir}/backgrounds/capivaraos/
+# NAO instalamos backgrounds/CapivaraOS_Logo.png: apesar de morar nesta pasta,
+# ela nao e um wallpaper -- e a arte-mestre (1536x1024) da qual os wallpapers
+# sao derivados. Instalada aqui, aparecia no seletor de papel de parede como
+# uma opcao escolhivel e, ao ser aplicada, saia com a logo gigante e cortada
+# pelo painel (visto na Pup 1.1.2 em 2026-07-21).
+for WP in backgrounds/*.png; do
+    [ "$(basename "$WP")" = "CapivaraOS_Logo.png" ] && continue
+    install -m 0644 "$WP" %{buildroot}%{_datadir}/backgrounds/capivaraos/
+done
 install -m 0644 backgrounds/CREDITOS.txt %{buildroot}%{_datadir}/backgrounds/capivaraos/
 
 # ── Pixmaps ──────────────────────────────────────────────────────────────────
@@ -492,7 +500,7 @@ plymouth-set-default-theme capivaraos >/dev/null 2>&1 || true
 # escritos aqui (em vez de %files) para evitar conflito de arquivo no dnf.
 cat > %{_sysconfdir}/os-release << 'EOF'
 NAME="CapivaraOS"
-VERSION="Pup 1.1.1"
+VERSION="Pup 1.1.2"
 RELEASE_TYPE=stable
 ID=capivaraos
 ID_LIKE=fedora
@@ -512,17 +520,17 @@ REDHAT_BUGZILLA_PRODUCT="Fedora"
 REDHAT_BUGZILLA_PRODUCT_VERSION=44
 REDHAT_SUPPORT_PRODUCT="Fedora"
 REDHAT_SUPPORT_PRODUCT_VERSION=44
-VARIANT="Pup 1.1.1"
+VARIANT="Pup 1.1.2"
 VARIANT_ID=pup
 EOF
 
 cat > %{_sysconfdir}/issue << 'EOF'
-CapivaraOS Pup 1.1.1 \n \l
+CapivaraOS Pup 1.1.2 \n \l
 
 EOF
 
 cat > %{_sysconfdir}/issue.net << 'EOF'
-CapivaraOS Pup 1.1.1
+CapivaraOS Pup 1.1.2
 EOF
 
 # ── Reaplica os-release apos qualquer atualizacao futura do sistema ────────
@@ -546,7 +554,7 @@ EOF
 grep -q '^NAME="CapivaraOS"' %{_prefix}/lib/os-release 2>/dev/null && exit 0
 cat > %{_sysconfdir}/os-release << 'EOF'
 NAME="CapivaraOS"
-VERSION="Pup 1.1.1"
+VERSION="Pup 1.1.2"
 RELEASE_TYPE=stable
 ID=capivaraos
 ID_LIKE=fedora
@@ -566,17 +574,17 @@ REDHAT_BUGZILLA_PRODUCT="Fedora"
 REDHAT_BUGZILLA_PRODUCT_VERSION=44
 REDHAT_SUPPORT_PRODUCT="Fedora"
 REDHAT_SUPPORT_PRODUCT_VERSION=44
-VARIANT="Pup 1.1.1"
+VARIANT="Pup 1.1.2"
 VARIANT_ID=pup
 EOF
 
 cat > %{_sysconfdir}/issue << 'EOF'
-CapivaraOS Pup 1.1.1 \n \l
+CapivaraOS Pup 1.1.2 \n \l
 
 EOF
 
 cat > %{_sysconfdir}/issue.net << 'EOF'
-CapivaraOS Pup 1.1.1
+CapivaraOS Pup 1.1.2
 EOF
 
 for kver in $(ls /lib/modules 2>/dev/null); do
@@ -601,6 +609,14 @@ done
 %{_datadir}/cockpit/branding/capivaraos/
 
 %changelog
+* Tue Jul 21 2026 CapivaraOS Project <capivaraos-bot@users.noreply.github.com> - 1.1.2-1
+- A arte-mestre backgrounds/CapivaraOS_Logo.png deixa de ser instalada como
+  papel de parede. Ela mora na pasta backgrounds/ apenas por ser a FONTE da
+  qual os wallpapers sao derivados, mas o %install usava um glob "*.png" e a
+  levava junto -- ela aparecia no seletor do xfdesktop como uma opcao
+  escolhivel e, aplicada, saia com a logo gigante e cortada pelo painel
+  (visto em captura da 1.1.1). Agora o loop de instalacao a pula.
+
 * Tue Jul 21 2026 CapivaraOS Project <capivaraos-bot@users.noreply.github.com> - 1.1.1-1
 - Zona segura nos wallpapers de foto: a logo e o credito de autoria sairam de
   40px/24px das laterais para 250px. Numa tela 4:3 exibindo um wallpaper 16:9
