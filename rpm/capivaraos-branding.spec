@@ -21,10 +21,10 @@ Version:        1.1.2
 # geram nomes de arquivo identicos -- ja causou dois incidentes (dnf instalou
 # o RPM do Pup no lugar do Snout em junho; build do Pup consumiu sources da
 # Marsh em 21/07, BUG-30). Com o sufixo a colisao e impossivel por construcao.
-Release:        1%{?dist}.pup
+Release:        2%{?dist}.pup
 Summary:        Identidade visual, wallpapers e branding padrão do CapivaraOS Pup
 
-License:        CC-BY-SA-4.0 AND MIT
+License:        GPL-3.0-or-later AND LicenseRef-CapivaraOS-Trademark AND CC-BY-SA-3.0 AND CC-BY-SA-4.0
 URL:            https://capivaraos.org
 BuildArch:      noarch
 
@@ -609,6 +609,18 @@ done
 %{_datadir}/cockpit/branding/capivaraos/
 
 %changelog
+* Fri Aug 14 2026 CapivaraOS Project <capivaraos-bot@users.noreply.github.com> - 1.1.2-2
+- Reconciliacao de licenca/marca (LEG-4): corrige o metadado License: do RPM.
+  Antes "CC-BY-SA-4.0 AND MIT" -- (a) marcava MIT sem nada MIT no pacote (codigo
+  e config do projeto sao GPLv3, como o LICENSE de topo), (b) varria a identidade
+  visual sob CC-BY-SA (contradiz a marca) e (c) omitia CC-BY-SA-3.0 de uma das
+  fotos embarcadas. Agora: GPL-3.0-or-later AND LicenseRef-CapivaraOS-Trademark
+  AND CC-BY-SA-3.0 AND CC-BY-SA-4.0. Correcao de metadado apenas; a atribuicao
+  exigida (CREDITOS.txt + creditos gravados nas imagens) ja estava correta (LEG-3).
+- Adiciona TRADEMARK.md: nome/logo CapivaraOS sao marca do projeto (direitos
+  reservados); codigo GPLv3; wallpapers fotograficos de terceiros CC BY-SA
+  creditados em backgrounds/CREDITOS.txt.
+
 * Tue Jul 21 2026 CapivaraOS Project <capivaraos-bot@users.noreply.github.com> - 1.1.2-1
 - A arte-mestre backgrounds/CapivaraOS_Logo.png deixa de ser instalada como
   papel de parede. Ela mora na pasta backgrounds/ apenas por ser a FONTE da
