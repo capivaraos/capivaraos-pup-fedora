@@ -15,13 +15,13 @@
 #     sem decoração de terceiros.
 
 Name:           capivaraos-branding
-Version:        1.1.2
+Version:        1.1.7
 # Sufixo ".pup": as tres spins constroem um pacote com este MESMO Name e
 # compartilham ~/rpmbuild, entao sem ele duas spins na mesma Version-Release
 # geram nomes de arquivo identicos -- ja causou dois incidentes (dnf instalou
 # o RPM do Pup no lugar do Snout em junho; build do Pup consumiu sources da
 # Marsh em 21/07, BUG-30). Com o sufixo a colisao e impossivel por construcao.
-Release:        2%{?dist}.pup
+Release:        1%{?dist}.pup
 Summary:        Identidade visual, wallpapers e branding padrão do CapivaraOS Pup
 
 License:        GPL-3.0-or-later AND LicenseRef-CapivaraOS-Trademark AND CC-BY-SA-3.0 AND CC-BY-SA-4.0
@@ -351,22 +351,29 @@ fi
 xfconf-query -c xfce4-desktop -p /last-settings-migration-version -n -t uint -s 1 2>>"\$LOG" || \\
 xfconf-query -c xfce4-desktop -p /last-settings-migration-version -s 1 2>>"\$LOG"
 
-# BUG CORRIGIDO (build anterior): o nome do "monitor" usado pelo xfdesktop
-# para renderizar de fato varia MUITO por ambiente -- "monitor0" em alguns,
-# "monitorVirtual-1" em GNOME Boxes/QXL (confirmado em teste real),
-# "monitoreDP-1"/"monitorHDMI-1" em hardware real. A versão anterior deste
-# script só verificava/corrigia "monitor0" e, quando esse (não usado para
-# renderização nenhuma) já estava certo, PULAVA a correção do monitor
-# realmente ativo. Agora tratamos TODOS os monitores conhecidos: os que já
-# existem no xfconf + os detectados via xrandr + "monitor0" como fallback.
+# BUG CORRIGIDO: o nome do "monitor" usado pelo xfdesktop para renderizar de
+# fato varia MUITO por ambiente -- nome numerico "0" em alguns, "Virtual-1" em
+# GNOME Boxes/QXL, "eDP-1"/"HDMI-1" em hardware real. Detectamos os monitores
+# conectados via /sys/class/drm (sysfs), que NAO depende do xrandr -- o xrandr
+# nao esta instalado na imagem (causa raiz do BUG-35: sem ele a versao anterior
+# nunca descobria o monitor ativo) e, mesmo instalado, nao funciona cedo no
+# login. Tratamos: os monitores que ja existem no xfconf + os do sysfs + "0"
+# como fallback. (O fallback e "0", NAO "monitor0": o prefixo 'monitor' e
+# concatenado abaixo; a versao anterior usava "monitor0" aqui e gerava o no
+# lixo 'monitormonitor0'.)
 EXISTING_MONITORS="\$(xfconf-query -c xfce4-desktop -l 2>/dev/null | sed -n 's#^/backdrop/screen0/monitor\\([^/]*\\)/.*#\\1#p' | sort -u)"
-XRANDR_MONITORS=""
-if command -v xrandr >/dev/null 2>&1; then
-    XRANDR_MONITORS="\$(xrandr --query 2>/dev/null | awk '/ connected/{print \$1}')"
-fi
-ALL_MONITORS="\$(printf '%s\\n%s\\nmonitor0\\n' "\$EXISTING_MONITORS" "\$XRANDR_MONITORS" | sort -u | grep -v '^\$')"
+DRM_MONITORS=""
+for st in /sys/class/drm/*/status; do
+    [ -f "\$st" ] || continue
+    [ "\$(cat "\$st" 2>/dev/null)" = "connected" ] || continue
+    # basename do diretorio e "cardN-<CONNECTOR>", ex.: card0-Virtual-1;
+    # removemos o prefixo "cardN-" para ficar com o nome do connector.
+    conn="\$(basename "\$(dirname "\$st")")"
+    DRM_MONITORS="\$DRM_MONITORS \${conn#*-}"
+done
+ALL_MONITORS="\$(printf '%s\\n%s\\n0\\n' "\$EXISTING_MONITORS" "\$DRM_MONITORS" | tr ' ' '\\n' | sort -u | grep -v '^\$')"
 echo "monitores conhecidos (xfconf): \${EXISTING_MONITORS:-<nenhum>}"
-echo "saidas xrandr: \${XRANDR_MONITORS:-<nenhuma>}"
+echo "monitores sysfs (drm): \${DRM_MONITORS:-<nenhum>}"
 echo "monitores a tratar: \${ALL_MONITORS:-<nenhum>}"
 
 NEED_RESTART=0
@@ -443,6 +450,72 @@ X-GNOME-Autostart-Phase=Applications
 OnlyShowIn=XFCE;
 EOF
 
+# ── Wallpaper no PRIMEIRO frame, sem flash (BUG-35) ─────────────────────────
+# O autostart acima corrige o wallpaper DEPOIS que o xfdesktop já desenhou (com
+# o image-style do monitor real ainda "Nenhuma", ele nao desenha imagem nenhuma
+# no 1o frame -> aparece fundo liso por ~3s ate o script setar e reiniciar).
+# Este hook roda no INICIO da sessao XFCE, ANTES do xfce4-session lancar o
+# xfdesktop (o startxfce4 fonteia /etc/xdg/xfce4/xinitrc.d/* antes de subir a
+# sessao). Ele grava o xfce4-desktop.xml do usuario com o NOME REAL do(s)
+# monitor(es) detectado(s) via sysfs, ja com image-style=3 (Esticado) e o nosso
+# last-image -> o xfdesktop ja nasce mostrando o fundo certo, sem flash nem
+# restart, e sem depender do xfconfd/D-Bus ainda estarem no ar (escrevemos o
+# arquivo direto, antes do xfconfd subir e le-lo).
+install -d %{buildroot}%{_sysconfdir}/xdg/xfce4/xinitrc.d
+cat > %{buildroot}%{_sysconfdir}/xdg/xfce4/xinitrc.d/50-capivaraos-wallpaper.sh << 'EOF'
+#!/bin/sh
+# Gera o backdrop do xfdesktop para os monitores conectados ANTES do xfdesktop
+# subir, para o wallpaper CapivaraOS aparecer ja no primeiro frame. Ver
+# capivaraos-branding.spec (BUG-35).
+WP=/usr/share/backgrounds/capivaraos/capivaraos-desktop-roxo-branco.png
+CFG="$HOME/.config/xfce4/xfconf/xfce-perchannel-xml"
+XML="$CFG/xfce4-desktop.xml"
+
+# Nao mexer se o usuario ja tem o wallpaper aplicado (respeita escolha futura).
+[ -f "$HOME/.config/.capivaraos-wallpaper-applied" ] && exit 0
+[ -f "$WP" ] || exit 0
+
+mkdir -p "$CFG"
+{
+  echo '<?xml version="1.0" encoding="UTF-8"?>'
+  echo ''
+  echo '<channel name="xfce4-desktop" version="1.0">'
+  echo '  <property name="last-settings-migration-version" type="uint" value="1"/>'
+  echo '  <property name="backdrop" type="empty">'
+  echo '    <property name="screen0" type="empty">'
+  _any=0
+  for st in /sys/class/drm/*/status; do
+    [ "$(cat "$st" 2>/dev/null)" = connected ] || continue
+    conn=$(basename "$(dirname "$st")")
+    mon=${conn#*-}
+    _any=1
+    echo "      <property name=\"monitor${mon}\" type=\"empty\">"
+    echo '        <property name="workspace0" type="empty">'
+    echo '          <property name="color-style" type="int" value="0"/>'
+    echo '          <property name="image-style" type="int" value="3"/>'
+    echo "          <property name=\"last-image\" type=\"string\" value=\"${WP}\"/>"
+    echo "          <property name=\"image-path\" type=\"string\" value=\"${WP}\"/>"
+    echo '        </property>'
+    echo '      </property>'
+  done
+  # Fallback: se nada foi detectado no sysfs, ao menos cobre "monitor0".
+  if [ "$_any" = 0 ]; then
+    echo '      <property name="monitor0" type="empty">'
+    echo '        <property name="workspace0" type="empty">'
+    echo '          <property name="color-style" type="int" value="0"/>'
+    echo '          <property name="image-style" type="int" value="3"/>'
+    echo "          <property name=\"last-image\" type=\"string\" value=\"${WP}\"/>"
+    echo "          <property name=\"image-path\" type=\"string\" value=\"${WP}\"/>"
+    echo '        </property>'
+    echo '      </property>'
+  fi
+  echo '    </property>'
+  echo '  </property>'
+  echo '</channel>'
+} > "$XML"
+EOF
+chmod 0755 %{buildroot}%{_sysconfdir}/xdg/xfce4/xinitrc.d/50-capivaraos-wallpaper.sh
+
 %post
 # Splash de boot CapivaraOS
 plymouth-set-default-theme capivaraos >/dev/null 2>&1 || true
@@ -496,11 +569,31 @@ Theme=capivaraos
 EOF
 plymouth-set-default-theme capivaraos >/dev/null 2>&1 || true
 
+# ── Wallpaper padrão do xfdesktop (correção definitiva do BUG-35) ────────────
+# O xfdesktop, quando NÃO há config de backdrop para o nome real do monitor
+# ativo (caso do 1º login, live e instalado -- o /etc/skel só cobre "monitor0"
+# e o script auxiliar não descobria o monitor real porque o xrandr não está
+# instalado), cai no arquivo de fundo "default" compilado no binário. Nesta
+# build do xfdesktop esses defaults são /usr/share/backgrounds/xfce/
+# xfce-verticals.png, xfce-stripes.png e xfce-teal.png -- que NEM EXISTIAM como
+# .png (só como .svg), deixando o comportamento errático (aparecia o fundo do
+# Fedora). Gravamos o nosso PNG por cima dos três: assim o PRIMEIRO login já
+# nasce com o fundo CapivaraOS, sem depender de xfconf/monitor/xrandr em
+# runtime. Feito em %posttrans (não %files) porque esses caminhos podem ser de
+# outro pacote -- evita conflito de arquivo no dnf, mesmo motivo do os-release.
+CAPIVARA_WP=%{_datadir}/backgrounds/capivaraos/capivaraos-desktop-roxo-branco.png
+if [ -f "$CAPIVARA_WP" ]; then
+    install -d %{_datadir}/backgrounds/xfce
+    for _def in xfce-verticals.png xfce-stripes.png xfce-teal.png; do
+        cp -f "$CAPIVARA_WP" %{_datadir}/backgrounds/xfce/"$_def" 2>/dev/null || true
+    done
+fi
+
 # /etc/os-release, /etc/issue, /etc/issue.net (fedora-release-common):
 # escritos aqui (em vez de %files) para evitar conflito de arquivo no dnf.
 cat > %{_sysconfdir}/os-release << 'EOF'
 NAME="CapivaraOS"
-VERSION="Pup 1.1.2"
+VERSION="Pup 1.1.7"
 RELEASE_TYPE=stable
 ID=capivaraos
 ID_LIKE=fedora
@@ -520,17 +613,17 @@ REDHAT_BUGZILLA_PRODUCT="Fedora"
 REDHAT_BUGZILLA_PRODUCT_VERSION=44
 REDHAT_SUPPORT_PRODUCT="Fedora"
 REDHAT_SUPPORT_PRODUCT_VERSION=44
-VARIANT="Pup 1.1.2"
+VARIANT="Pup 1.1.7"
 VARIANT_ID=pup
 EOF
 
 cat > %{_sysconfdir}/issue << 'EOF'
-CapivaraOS Pup 1.1.2 \n \l
+CapivaraOS Pup 1.1.7 \n \l
 
 EOF
 
 cat > %{_sysconfdir}/issue.net << 'EOF'
-CapivaraOS Pup 1.1.2
+CapivaraOS Pup 1.1.7
 EOF
 
 # ── Reaplica os-release apos qualquer atualizacao futura do sistema ────────
@@ -554,7 +647,7 @@ EOF
 grep -q '^NAME="CapivaraOS"' %{_prefix}/lib/os-release 2>/dev/null && exit 0
 cat > %{_sysconfdir}/os-release << 'EOF'
 NAME="CapivaraOS"
-VERSION="Pup 1.1.2"
+VERSION="Pup 1.1.7"
 RELEASE_TYPE=stable
 ID=capivaraos
 ID_LIKE=fedora
@@ -574,17 +667,17 @@ REDHAT_BUGZILLA_PRODUCT="Fedora"
 REDHAT_BUGZILLA_PRODUCT_VERSION=44
 REDHAT_SUPPORT_PRODUCT="Fedora"
 REDHAT_SUPPORT_PRODUCT_VERSION=44
-VARIANT="Pup 1.1.2"
+VARIANT="Pup 1.1.7"
 VARIANT_ID=pup
 EOF
 
 cat > %{_sysconfdir}/issue << 'EOF'
-CapivaraOS Pup 1.1.2 \n \l
+CapivaraOS Pup 1.1.7 \n \l
 
 EOF
 
 cat > %{_sysconfdir}/issue.net << 'EOF'
-CapivaraOS Pup 1.1.2
+CapivaraOS Pup 1.1.7
 EOF
 
 for kver in $(ls /lib/modules 2>/dev/null); do
@@ -603,12 +696,49 @@ done
 %{_datadir}/plymouth/themes/capivaraos/
 %{_bindir}/capivaraos-set-wallpaper
 %{_sysconfdir}/xdg/autostart/capivaraos-wallpaper.desktop
+%{_sysconfdir}/xdg/xfce4/xinitrc.d/50-capivaraos-wallpaper.sh
 %{_sysconfdir}/skel/.config/xfce4/xfconf/xfce-perchannel-xml/xfce4-desktop.xml
 %{_sysconfdir}/skel/.face
 %{_sysconfdir}/skel/.face.icon
 %{_datadir}/cockpit/branding/capivaraos/
 
 %changelog
+* Sat Aug 15 2026 CapivaraOS Project <capivaraos-bot@users.noreply.github.com> - 1.1.7-1
+- Release publica 1.1.7 (numero unico entre as spins: 1.1.3 e do Marsh,
+  1.1.4-1.1.6 do Snout; 1.1.2 -> 1.1.7).
+- Wallpaper CapivaraOS agora aplica AUTOMATICAMENTE no 1o login (live e
+  instalado), sem precisar trocar na mao (BUG-35). O capivaraos-set-wallpaper
+  passa a detectar o monitor via /sys/class/drm (o xrandr nao esta na imagem,
+  causa raiz do bug) e corrige o no lixo "monitormonitor0"; o %posttrans grava
+  o nosso PNG sobre os defaults do xfdesktop; um hook em xinitrc.d pre-configura
+  o backdrop no inicio da sessao.
+- CONHECIDO (deferido): no 1o boot ainda ha ~3s com o fundo antigo antes de
+  virar o nosso (flash cosmetico). O wallpaper aplica de forma confiavel; falta
+  so eliminar essa janela inicial -- rastreado para correcao definitiva futura.
+- Consolida tambem a reconciliacao de licenca/marca (LEG-4) e ajustes
+  acumulados desde a 1.1.2 (ver entradas abaixo).
+* Sat Aug 15 2026 CapivaraOS Project <capivaraos-bot@users.noreply.github.com> - 1.1.2-4
+- Wallpaper CapivaraOS agora aparece ja no PRIMEIRO frame, sem o flash de ~3s
+  de fundo liso (BUG-35). O -3 fazia o wallpaper aplicar, mas so depois do
+  script rodar (o image-style do monitor real nascia "Nenhuma", entao o
+  xfdesktop nao desenhava imagem ate o script setar e reiniciar). Novo hook
+  /etc/xdg/xfce4/xinitrc.d/50-capivaraos-wallpaper.sh gera o xfce4-desktop.xml
+  do usuario com o nome real do(s) monitor(es) (via sysfs) ANTES do xfdesktop
+  subir -> primeiro frame ja nasce com image-style=3 e o nosso last-image, sem
+  flash nem restart, sem depender de xrandr/xfconfd em runtime.
+* Sat Aug 15 2026 CapivaraOS Project <capivaraos-bot@users.noreply.github.com> - 1.1.2-3
+- Wallpaper do CapivaraOS agora aparece ja no PRIMEIRO login (live e instalado)
+  -- BUG-35. Causa raiz: sem config de backdrop para o nome real do monitor, o
+  xfdesktop caia no arquivo default compilado (xfce-verticals/stripes/teal.png),
+  que nem existiam como .png -> aparecia o fundo do Fedora ate o usuario trocar
+  na mao uma vez. Correcoes:
+  . %posttrans grava o nosso PNG por cima desses tres arquivos default do
+    xfdesktop (nao existem/nao sao de nenhum pacote -> sem conflito de dnf).
+    Assim o 1o boot ja nasce com o fundo certo, sem depender de runtime.
+  . capivaraos-set-wallpaper: detecta monitores via /sys/class/drm (sysfs) em
+    vez de xrandr, que NAO esta instalado na imagem -- por isso o script nunca
+    descobria o monitor ativo. Corrige tambem o no lixo "monitormonitor0"
+    (fallback era "monitor0", concatenado depois de "monitor"; agora e "0").
 * Fri Aug 14 2026 CapivaraOS Project <capivaraos-bot@users.noreply.github.com> - 1.1.2-2
 - Reconciliacao de licenca/marca (LEG-4): corrige o metadado License: do RPM.
   Antes "CC-BY-SA-4.0 AND MIT" -- (a) marcava MIT sem nada MIT no pacote (codigo
