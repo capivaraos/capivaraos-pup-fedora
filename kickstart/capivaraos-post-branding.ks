@@ -18,8 +18,21 @@
 # Theme=capivaraos). Sem regenerar aqui, a initramfs da ISO live continua
 # com o tema padrão do Plymouth. Este %post roda depois de toda a transação
 # de pacotes, garantindo que o dracut leia o plymouthd.conf já atualizado.
+#
+# --no-hostonly (e --no-hostonly-cmdline) é OBRIGATÓRIO (BUG-40, comprovado
+# 2026-08-17). O padrão do dracut no Fedora é hostonly="yes"; como este %post
+# roda no BUILD (o dracut enxerga o hardware da MÁQUINA DE BUILD), sem estes
+# flags o initramfs sai só com os drivers do build. Isso NÃO afeta o live boot
+# (roda do USB, drivers genéricos), mas o SISTEMA INSTALADO herda esse mesmo
+# initramfs e, num hardware com storage diferente do build, NÃO acha o disco
+# raiz -> dracut-initqueue timeout -> "Not all disks have been found" ->
+# emergency mode. Caso real: Positivo NTB Q232A (eMMC/Bay Trail): o initramfs
+# hostonly tinha nvme (do build) mas NÃO tinha sdhci-acpi/sdhci-pci/mmc_block
+# (do eMMC do alvo). Genérico (--no-hostonly) inclui todos -> boota em qualquer
+# hardware. Depois de instalado, updates de kernel regeneram hostonly no
+# proprio alvo (correto). NÃO reverter para hostonly.
 for kver in $(ls /lib/modules); do
-    dracut -f "/boot/initramfs-${kver}.img" "${kver}"
+    dracut -f --no-hostonly --no-hostonly-cmdline "/boot/initramfs-${kver}.img" "${kver}"
 done
 
 # ── Idioma: pt_BR com fallback para en_US ───────────────────────────────────
