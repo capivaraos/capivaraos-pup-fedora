@@ -15,7 +15,7 @@
 #     sem decoração de terceiros.
 
 Name:           capivaraos-branding
-Version:        1.1.7
+Version:        1.1.8
 # Sufixo ".pup": as tres spins constroem um pacote com este MESMO Name e
 # compartilham ~/rpmbuild, entao sem ele duas spins na mesma Version-Release
 # geram nomes de arquivo identicos -- ja causou dois incidentes (dnf instalou
@@ -516,6 +516,26 @@ mkdir -p "$CFG"
 EOF
 chmod 0755 %{buildroot}%{_sysconfdir}/xdg/xfce4/xinitrc.d/50-capivaraos-wallpaper.sh
 
+# ── Perfil do Anaconda: faz o instalador reconhecer o CapivaraOS (BUG-38) ────
+# O Anaconda casa o perfil de instalacao pelo os_id do /etc/os-release. Como o
+# nosso ID e "capivaraos" (nao "fedora"), NENHUM perfil casava e o instalador
+# caia no default de /etc/anaconda/anaconda.conf, que define efi_dir=default.
+# Em UEFI isso faz o gen_grub_cfgstub tentar gravar o stub em
+# /boot/efi/EFI/default (inexistente -- shim/grub2-efi instalam em /EFI/fedora)
+# -> "gen_grub_cfgstub script failed" e a instalacao FALHA no passo do
+# bootloader. So aparece em UEFI real; em VM no modo BIOS/legacy o caminho EFI
+# nem roda (por isso nao pegamos antes). Herdando base_profile=fedora, o
+# CapivaraOS reusa efi_dir=fedora, esquema BTRFS e demais ajustes do Fedora.
+install -d %{buildroot}%{_sysconfdir}/anaconda/profile.d
+cat > %{buildroot}%{_sysconfdir}/anaconda/profile.d/capivaraos.conf << 'EOF'
+[Profile]
+profile_id = capivaraos
+base_profile = fedora
+
+[Profile Detection]
+os_id = capivaraos
+EOF
+
 %post
 # Splash de boot CapivaraOS
 plymouth-set-default-theme capivaraos >/dev/null 2>&1 || true
@@ -593,7 +613,7 @@ fi
 # escritos aqui (em vez de %files) para evitar conflito de arquivo no dnf.
 cat > %{_sysconfdir}/os-release << 'EOF'
 NAME="CapivaraOS"
-VERSION="Pup 1.1.7"
+VERSION="Pup 1.1.8"
 RELEASE_TYPE=stable
 ID=capivaraos
 ID_LIKE=fedora
@@ -613,17 +633,17 @@ REDHAT_BUGZILLA_PRODUCT="Fedora"
 REDHAT_BUGZILLA_PRODUCT_VERSION=44
 REDHAT_SUPPORT_PRODUCT="Fedora"
 REDHAT_SUPPORT_PRODUCT_VERSION=44
-VARIANT="Pup 1.1.7"
+VARIANT="Pup 1.1.8"
 VARIANT_ID=pup
 EOF
 
 cat > %{_sysconfdir}/issue << 'EOF'
-CapivaraOS Pup 1.1.7 \n \l
+CapivaraOS Pup 1.1.8 \n \l
 
 EOF
 
 cat > %{_sysconfdir}/issue.net << 'EOF'
-CapivaraOS Pup 1.1.7
+CapivaraOS Pup 1.1.8
 EOF
 
 # ── Reaplica os-release apos qualquer atualizacao futura do sistema ────────
@@ -647,7 +667,7 @@ EOF
 grep -q '^NAME="CapivaraOS"' %{_prefix}/lib/os-release 2>/dev/null && exit 0
 cat > %{_sysconfdir}/os-release << 'EOF'
 NAME="CapivaraOS"
-VERSION="Pup 1.1.7"
+VERSION="Pup 1.1.8"
 RELEASE_TYPE=stable
 ID=capivaraos
 ID_LIKE=fedora
@@ -667,17 +687,17 @@ REDHAT_BUGZILLA_PRODUCT="Fedora"
 REDHAT_BUGZILLA_PRODUCT_VERSION=44
 REDHAT_SUPPORT_PRODUCT="Fedora"
 REDHAT_SUPPORT_PRODUCT_VERSION=44
-VARIANT="Pup 1.1.7"
+VARIANT="Pup 1.1.8"
 VARIANT_ID=pup
 EOF
 
 cat > %{_sysconfdir}/issue << 'EOF'
-CapivaraOS Pup 1.1.7 \n \l
+CapivaraOS Pup 1.1.8 \n \l
 
 EOF
 
 cat > %{_sysconfdir}/issue.net << 'EOF'
-CapivaraOS Pup 1.1.7
+CapivaraOS Pup 1.1.8
 EOF
 
 for kver in $(ls /lib/modules 2>/dev/null); do
@@ -697,12 +717,22 @@ done
 %{_bindir}/capivaraos-set-wallpaper
 %{_sysconfdir}/xdg/autostart/capivaraos-wallpaper.desktop
 %{_sysconfdir}/xdg/xfce4/xinitrc.d/50-capivaraos-wallpaper.sh
+%{_sysconfdir}/anaconda/profile.d/capivaraos.conf
 %{_sysconfdir}/skel/.config/xfce4/xfconf/xfce-perchannel-xml/xfce4-desktop.xml
 %{_sysconfdir}/skel/.face
 %{_sysconfdir}/skel/.face.icon
 %{_datadir}/cockpit/branding/capivaraos/
 
 %changelog
+* Mon Aug 17 2026 CapivaraOS Project <capivaraos-bot@users.noreply.github.com> - 1.1.8-1
+- Corrige a FALHA de instalacao em UEFI no passo do bootloader (BUG-38):
+  "org.fedoraproject.Anaconda.BootloaderInstallationError: gen_grub_cfgstub
+  script failed". Causa raiz: o Anaconda casa o perfil pelo os_id do os-release;
+  com ID=capivaraos nenhum perfil casava e ele caia no default (efi_dir=default),
+  entao o gen_grub_cfgstub tentava gravar em /boot/efi/EFI/default (inexistente:
+  shim/grub2-efi vivem em /EFI/fedora). So afetava UEFI real (VMs em BIOS/legacy
+  passavam). Fix: empacota /etc/anaconda/profile.d/capivaraos.conf herdando
+  base_profile=fedora (reusa efi_dir=fedora, esquema BTRFS etc.).
 * Sat Aug 15 2026 CapivaraOS Project <capivaraos-bot@users.noreply.github.com> - 1.1.7-1
 - Release publica 1.1.7 (numero unico entre as spins: 1.1.3 e do Marsh,
   1.1.4-1.1.6 do Snout; 1.1.2 -> 1.1.7).

@@ -15,8 +15,8 @@
 #   livemedia-creator --ks=/var/tmp/capivaraos-pup-flat.ks \
 #       --no-virt --resultdir=/var/tmp/capivaraos-pup-result \
 #       --project="CapivaraOS Pup" --make-iso --iso-only \
-#       --iso-name=CapivaraOS-Pup-1.1.7-x86_64.iso \
-#       --volid="CapivaraOS Pup 1.1.7" --variant="CapivaraOS Pup" \
+#       --iso-name=CapivaraOS-Pup-1.1.8-x86_64.iso \
+#       --volid="CapivaraOS Pup 1.1.8" --variant="CapivaraOS Pup" \
 #       --releasever=44
 #
 # NOTA: o anaconda resolve "%include caminho.ks" em relação ao seu próprio

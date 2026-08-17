@@ -110,7 +110,7 @@ cd rpm
 ./build-rpm.sh
 ```
 
-Gera `~/rpmbuild/RPMS/noarch/capivaraos-branding-1.1.7-1.*.noarch.rpm`.
+Gera `~/rpmbuild/RPMS/noarch/capivaraos-branding-1.1.8-1.*.noarch.rpm`.
 
 ### Passo 2 — Disponibilizar o RPM como repositório local
 
@@ -132,19 +132,19 @@ python3 ks-flatten.py capivaraos-pup.ks > /var/tmp/capivaraos-pup-flat.ks
 sudo livemedia-creator --ks=/var/tmp/capivaraos-pup-flat.ks \
     --no-virt --resultdir=/var/tmp/capivaraos-pup-result \
     --project="CapivaraOS Pup" --make-iso --iso-only \
-    --iso-name=CapivaraOS-Pup-1.1.7-x86_64.iso \
-    --volid="CapivaraOS Pup 1.1.7" --variant="CapivaraOS Pup" \
+    --iso-name=CapivaraOS-Pup-1.1.8-x86_64.iso \
+    --volid="CapivaraOS Pup 1.1.8" --variant="CapivaraOS Pup" \
     --releasever=44
 ```
 
 A ISO final fica em
-`/var/tmp/capivaraos-pup-result/CapivaraOS-Pup-1.1.7-x86_64.iso`.
+`/var/tmp/capivaraos-pup-result/CapivaraOS-Pup-1.1.8-x86_64.iso`.
 
 ## Testando a ISO
 
 ```bash
 qemu-system-x86_64 -m 4096 -enable-kvm \
-    -cdrom /var/tmp/capivaraos-pup-result/CapivaraOS-Pup-1.1.7-x86_64.iso
+    -cdrom /var/tmp/capivaraos-pup-result/CapivaraOS-Pup-1.1.8-x86_64.iso
 ```
 
 (`-m 4096` simula o requisito mínimo de 4GB RAM da spin.)
