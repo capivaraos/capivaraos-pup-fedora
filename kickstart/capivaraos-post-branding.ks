@@ -18,8 +18,18 @@
 # Theme=capivaraos). Sem regenerar aqui, a initramfs da ISO live continua
 # com o tema padrão do Plymouth. Este %post roda depois de toda a transação
 # de pacotes, garantindo que o dracut leia o plymouthd.conf já atualizado.
+#
+# CRÍTICO (BUG-39): usar --no-hostonly (e --no-hostonly-cmdline). O padrao do
+# dracut no Fedora e hostonly="yes" (/usr/lib/dracut/dracut.conf.d/01-dist.conf).
+# Como este %post roda no build (livemedia-creator --no-virt enxerga o hardware
+# da MAQUINA DE BUILD), sem estes flags o initramfs sai so com os drivers do
+# build -> generico o bastante pra VM, mas FALTANDO drivers de hardware real
+# (ex.: i915 valleyview, SoC/PMIC e storage de netbooks Bay Trail). Resultado:
+# a imagem sobe na VM mas o hardware real mostra o Plymouth e DESLIGA (o live
+# nem chega no instalador). Uma imagem distribuivel PRECISA de initramfs
+# generico (hostonly=no), como faz a initramfs generica do proprio Fedora.
 for kver in $(ls /lib/modules); do
-    dracut -f "/boot/initramfs-${kver}.img" "${kver}"
+    dracut -f --no-hostonly --no-hostonly-cmdline "/boot/initramfs-${kver}.img" "${kver}"
 done
 
 # ── Idioma: pt_BR com fallback para en_US ───────────────────────────────────
